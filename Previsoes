@@ -1,7 +1,3 @@
-Aqui está a explicação sobre como criar um modelo de previsão com pontos de extremidade configurados no Azure, escrita em primeira pessoa:
-
-
----
 
 Como Criar um Modelo de Previsão com Pontos de Extremidade no Azure
 
@@ -11,7 +7,7 @@ Para criar um modelo de previsão com pontos de extremidade configurados no Azur
 
 1.1 Criando uma Conta no Azure
 
-Primeiro, criei uma conta no Azure (caso não tenha uma ainda). Após isso, acessei o portal do Azure para começar a configurar o ambiente.
+Primeiro, realizei o acesso ao portal do Azure para começar a configurar o ambiente.
 
 1.2 Criando um Workspace no Azure Machine Learning
 
