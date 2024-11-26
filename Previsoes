@@ -1,0 +1,173 @@
+Aqui está a explicação sobre como criar um modelo de previsão com pontos de extremidade configurados no Azure, escrita em primeira pessoa:
+
+
+---
+
+Como Criar um Modelo de Previsão com Pontos de Extremidade no Azure
+
+Para criar um modelo de previsão com pontos de extremidade configurados no Azure, eu sigo uma série de etapas que envolvem desde a preparação do ambiente até a implantação do modelo como um serviço web. Vou compartilhar o passo a passo que segui para construir e expor meu modelo de previsão.
+
+1. Preparando o Ambiente no Azure
+
+1.1 Criando uma Conta no Azure
+
+Primeiro, criei uma conta no Azure (caso não tenha uma ainda). Após isso, acessei o portal do Azure para começar a configurar o ambiente.
+
+1.2 Criando um Workspace no Azure Machine Learning
+
+Criei um Workspace no Azure Machine Learning. Um Workspace é o local onde vou gerenciar todos os meus experimentos, modelos e endpoints. Esse é o primeiro passo para começar a trabalhar com aprendizado de máquina na plataforma.
+
+2. Criando o Modelo de Previsão
+
+2.1 Preparando os Dados
+
+O próximo passo foi preparar os dados para o modelo. Eu fiz isso carregando um conjunto de dados para o Azure, o qual pode vir de diversas fontes, como um arquivo CSV. A partir daí, comecei o pré-processamento dos dados, como remoção de valores ausentes ou transformação de variáveis.
+
+2.2 Criando o Script para Treinar o Modelo
+
+No meu caso, escolhi utilizar o Python e a biblioteca scikit-learn para criar um modelo simples de regressão linear. O código que escrevi é o seguinte:
+
+# importando as bibliotecas necessárias
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
+import joblib
+
+# Carregar os dados
+data = pd.read_csv("seu_arquivo.csv")
+X = data.drop('coluna_alvo', axis=1)  # Variáveis independentes
+y = data['coluna_alvo']  # Variável dependente
+
+# Dividir os dados em treino e teste
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Criar o modelo
+model = LinearRegression()
+
+# Treinar o modelo
+model.fit(X_train, y_train)
+
+# Fazer previsões
+y_pred = model.predict(X_test)
+
+# Avaliar o modelo
+mse = mean_squared_error(y_test, y_pred)
+print(f"Erro quadrático médio: {mse}")
+
+# Salvar o modelo
+joblib.dump(model, 'modelo_previsao.pkl')
+
+2.3 Carregando o Script para o Azure
+
+Para treinar o modelo, carreguei o script de Python no Azure Machine Learning. Dentro do Azure ML Studio, criei um experimento, configurei o ambiente com as dependências necessárias e executei o código para treinar o modelo.
+
+3. Implantando o Modelo no Azure
+
+Após treinar o modelo, era hora de implantá-lo no Azure para disponibilizá-lo como um serviço web, ou seja, como uma API.
+
+3.1 Criando um Ambiente de Docker no Azure ML
+
+Para hospedar o modelo, criei um container Docker que embala o modelo e todas as dependências necessárias. Esse container garante que o modelo funcione corretamente em qualquer ambiente.
+
+3.2 Registrando o Modelo no Azure ML
+
+Registrei o modelo treinado no Azure Machine Learning para poder usá-lo nas implantações subsequentes. Para isso, utilizei o SDK do Azure em Python:
+
+from azureml.core import Workspace
+from azureml.core.model import Model
+
+# Conectar ao Workspace
+workspace = Workspace.from_config()
+
+# Registrar o modelo
+model = Model.register(workspace=workspace,
+                       model_name="modelo_previsao",
+                       model_path="modelo_previsao.pkl")
+
+3.3 Criando o Script de Serviço Web (API)
+
+Em seguida, criei um script score.py que seria usado para expor o modelo como uma API. O código do script é o seguinte:
+
+import joblib
+import json
+import numpy as np
+from azureml.core.model import Model
+
+def init():
+    global model
+    model_path = Model.get_model_path("modelo_previsao")
+    model = joblib.load(model_path)
+
+def run(data):
+    try:
+        # Converte a entrada JSON para um array NumPy
+        data = json.loads(data)
+        input_data = np.array(data['input_data']).reshape(1, -1)
+        
+        # Faz a previsão
+        prediction = model.predict(input_data)
+        
+        # Retorna a previsão como JSON
+        return json.dumps({"prediction": prediction.tolist()})
+    
+    except Exception as e:
+        error = str(e)
+        return json.dumps({"error": error})
+
+3.4 Implantando o Modelo como um Serviço Web
+
+Agora, era só implantar o modelo como um serviço web. Eu usei o Azure Container Instance (ACI) para isso, criando um serviço web com o modelo implantado:
+
+from azureml.core.webservice import AciWebservice
+from azureml.core.model import Model
+from azureml.core import Environment
+from azureml.core.webservice import Webservice
+
+# Configuração do ambiente
+env = Environment.from_conda_specification(name="env", file_path="environment.yml")
+
+# Configuração do ACI
+aci_config = AciWebservice.deploy_configuration(cpu_cores=1, memory_gb=1)
+
+# Implante o modelo
+service = Model.deploy(workspace=workspace,
+                       name="modelo-de-previsao-api",
+                       models=[model],
+                       inference_config=env,
+                       deployment_config=aci_config)
+
+# Esperar até o serviço estar pronto
+service.wait_for_deployment(show_output=True)
+
+# Obter a URL do serviço
+print(service.scoring_uri)
+
+4. Testando o Endpoint da API
+
+Depois que o serviço foi implantado, agora eu poderia enviar dados de entrada para a API e receber as previsões geradas pelo modelo. Para fazer isso, utilizei a biblioteca requests para enviar dados para o endpoint da API.
+
+Exemplo de código para testar a API:
+
+import requests
+import json
+
+url = "<URL_DO_ENDPOINT>"
+
+# Dados de entrada para o modelo
+data = {
+    "input_data": [valor1, valor2, valor3]
+}
+
+headers = {'Content-Type': 'application/json'}
+
+# Enviar solicitação POST
+response = requests.post(url, data=json.dumps(data), headers=headers)
+
+# Exibir a previsão
+print(response.json())
+
+5. Conclusão
+
+Com esses passos, consegui criar um modelo de previsão no Azure Machine Learning, implantá-lo como um serviço web, e configurar pontos de extremidade para que o modelo pudesse ser acessado via API. Agora, posso fazer previsões em tempo real enviando dados para o endpoint configurado. O Azure também oferece ferramentas para monitorar e ajustar o modelo conforme necessário.
+
